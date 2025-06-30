@@ -35,6 +35,11 @@ resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
 }
 
+# Elastic IP for NAT Gateway
+resource "aws_eip" "nat" {
+  # Automatically allocates an EIP for the NAT Gateway
+}
+
 resource "aws_nat_gateway" "natgw" {
   allocation_id = aws_eip.nat.id
   subnet_id     = values(aws_subnet.public)[0].id
