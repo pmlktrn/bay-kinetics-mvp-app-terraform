@@ -6,7 +6,6 @@ resource "aws_vpc" "main" {
 
 data "aws_availability_zones" "azs" {}
 
-# Public Subnets
 resource "aws_subnet" "public" {
   for_each                = toset(var.public_subnets)
   vpc_id                  = aws_vpc.main.id
@@ -16,7 +15,6 @@ resource "aws_subnet" "public" {
   tags = { Name = "public-${each.value}" }
 }
 
-# Private Subnets
 resource "aws_subnet" "private" {
   for_each          = toset(var.private_subnets)
   vpc_id            = aws_vpc.main.id
@@ -25,7 +23,6 @@ resource "aws_subnet" "private" {
   tags = { Name = "private-${each.value}" }
 }
 
-# DB Subnets
 resource "aws_subnet" "db" {
   for_each          = toset(var.db_subnets)
   vpc_id            = aws_vpc.main.id
@@ -34,49 +31,60 @@ resource "aws_subnet" "db" {
   tags = { Name = "db-${each.value}" }
 }
 
-# Internet Gateway
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
 }
 
-# NAT Gateway
-resource "aws_eip" "nat" { vpc = true }
+resource "aws_eip" "nat" {
+  vpc = true
+}
 resource "aws_nat_gateway" "natgw" {
   allocation_id = aws_eip.nat.id
   subnet_id     = values(aws_subnet.public)[0].id
 }
 
-# Route Tables
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
-  route { cidr_block = "0.0.0.0/0"; gateway_id = aws_internet_gateway.igw.id }
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+  }
 }
 resource "aws_route_table_association" "public_assoc" {
-  for_each = aws_subnet.public
+  for_each       = aws_subnet.public
   subnet_id      = each.value.id
   route_table_id = aws_route_table.public.id
 }
 
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
-  route { cidr_block = "0.0.0.0/0"; nat_gateway_id = aws_nat_gateway.natgw.id }
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.natgw.id
+  }
 }
 resource "aws_route_table_association" "private_assoc" {
-  for_each = aws_subnet.private
+  for_each       = aws_subnet.private
   subnet_id      = each.value.id
   route_table_id = aws_route_table.private.id
 }
 
-# Network ACLs
 resource "aws_network_acl" "public_acl" {
   vpc_id     = aws_vpc.main.id
   subnet_ids = values(aws_subnet.public)[*].id
 }
-resource "aws_network_acl_rule" "public_acl_rule" {
-  for_each       = { inbound=false, outbound=true }
+resource "aws_network_acl_rule" "public_in" {
   network_acl_id = aws_network_acl.public_acl.id
   rule_number    = 100
-  egress         = each.key == "outbound"
+  egress         = false
+  protocol       = "-1"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+}
+resource "aws_network_acl_rule" "public_out" {
+  network_acl_id = aws_network_acl.public_acl.id
+  rule_number    = 100
+  egress         = true
   protocol       = "-1"
   rule_action    = "allow"
   cidr_block     = "0.0.0.0/0"
@@ -86,11 +94,18 @@ resource "aws_network_acl" "private_acl" {
   vpc_id     = aws_vpc.main.id
   subnet_ids = values(aws_subnet.private)[*].id
 }
-resource "aws_network_acl_rule" "private_acl_rule" {
-  for_each       = { inbound=false, outbound=true }
+resource "aws_network_acl_rule" "private_in" {
   network_acl_id = aws_network_acl.private_acl.id
   rule_number    = 100
-  egress         = each.key == "outbound"
+  egress         = false
+  protocol       = "-1"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+}
+resource "aws_network_acl_rule" "private_out" {
+  network_acl_id = aws_network_acl.private_acl.id
+  rule_number    = 100
+  egress         = true
   protocol       = "-1"
   rule_action    = "allow"
   cidr_block     = "0.0.0.0/0"
