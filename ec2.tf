@@ -33,13 +33,17 @@ resource "aws_security_group" "bastion_sg" {
 resource "aws_security_group" "app_sg" {
   name        = "app-sg"
   vpc_id      = aws_vpc.main.id
+
   ingress {
-    from_port       = var.app_instance_type == "" ? 0 : var.app_instance_type
-    to_port         = var.app_instance_type == "" ? 0 : var.app_instance_type
+    description     = "Allow application port from bastion"
+    from_port       = var.app_port
+    to_port         = var.app_port
     protocol        = "tcp"
     security_groups = [aws_security_group.bastion_sg.id]
   }
+
   egress {
+    description = "Allow all outbound"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -47,7 +51,7 @@ resource "aws_security_group" "app_sg" {
   }
 }
 
-data "aws_ami" "linux" {
+data "aws_ami" "linux" "linux" {
   owners      = ["amazon"]
   most_recent = true
   filter {
